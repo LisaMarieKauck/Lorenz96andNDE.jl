@@ -3,6 +3,9 @@ uuid = "1c9eb66e-168a-43d5-8666-64b9f568c235"
 authors = ["Lisa Kauck <lisa.kauck@tum.de"]
 version = "0.1.0"
 
+[deps]
+Flux = "587475ba-b771-5e3f-ad9e-33799f191a9c"
+
 [compat]
 julia = "1.6"
 
