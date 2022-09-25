@@ -1,8 +1,10 @@
 module Lorenz96andNDE
 
-using DifferentialEquations, Flux, DiffEqFlux
-using  CUDA, OrdinaryDiffEq, BenchmarkTools, JLD2, Plots, Random
-#using NODEData, Flux, DiffEqFlux 
+using DifferentialEquations, Flux, DiffEqFlux, Plots, NODEData
+using  CUDA, OrdinaryDiffEq, BenchmarkTools
+using  Random, JLD2
+using ChaoticNDETools
+
 function lorenz96!(dy,y,p,t) 
     F, K = p
     
@@ -17,23 +19,34 @@ K = 36; # so 10 degrees of longtitude per node
 F = 0.5;
 dt=0.1;
 N_t=500;
+N_t_train = N_t
+N_t_valid = N_t_train*3
+N_t = N_t_train + N_t_valid
 t_transient=100.;
 tspan=(0., t_transient+N_t*0.1)
 u0 = rand(K);
 
 prob = ODEProblem(lorenz96!, u0, tspan, (F, K));
-sol = solve(prob, Tsit5(), saveat=t_transient:dt:t_transient + N_t * dt);
+sol = solve(prob, Tsit5(), saveat=t_transient:dt:t_transient + N_t * dt)
 
-train, valid = NODEDataloader(sol, 10; dt=dt, valid_set=0.8)
+t_train = t_transient:dt:t_transient+N_t_train*dt
+data_train = DeviceArray(sol(t_train))
 
-N_WEIGHTS = 10 
+t_valid = t_transient+N_t_train*dt:dt:t_transient+N_t_train*dt+N_t_valid*dt
+data_valid = DeviceArray(sol(t_valid))
+
+#train, valid = NODEDataloader(sol, 10; dt=dt, valid_set=0.8)
+train = NODEDataloader(Float32.(data_train), t_train, 2)
+valid = NODEDataloader(Float32.(data_valid), t_valid, 2)
+
+N_WEIGHTS = 15
 nn = Chain(Dense(2, N_WEIGHTS, swish), Dense(N_WEIGHTS, N_WEIGHTS, swish), Dense(N_WEIGHTS, N_WEIGHTS, swish), Dense(N_WEIGHTS, 2)) |> gpu
 p, re_nn = Flux.destructure(nn)
 
 neural_ode(u, p, t) = re_nn(p)(u)
-node_prob = ODEProblem(neural_ode, x0, (Float32(0.),Float32(dt)), p)
+node_prob = ODEProblem(neural_ode, u0, (Float32(0.),Float32(dt)), p)
 
-predict(t, u0) = Array(solve(remake(node_prob; tspan=(t[1],t[end]),u0=u0, p=p), Tsit5(), dt=dt, saveat = t))
+predict(t, u0; reltol=1e-5) = DeviceArray(solve(remake(node_prob; tspan=(t[1],t[end]),u0=u0, p=p), Tsit5(), dt=dt, saveat = t, reltol=reltol))
 
 loss(t, u0) = sum(abs2, predict(t, view(u0,:,1)) - u0)
 
