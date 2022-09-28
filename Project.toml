@@ -5,12 +5,16 @@ version = "0.1.0"
 
 [deps]
 CUDA = "052768ef-5323-5732-b1bb-66c8b64840ba"
+CairoMakie = "13f3f980-e62b-5c42-98c6-ff1f3baf88f0"
 ChaoticNDETools = "c9c3e87f-99dd-4ea8-9de5-c6a08e86872f"
 DiffEqFlux = "aae7a2af-3d4f-5e19-a356-7da93b79d9d0"
+DynamicalSystems = "61744808-ddfa-5f27-97ff-6e42cc95d634"
 Flux = "587475ba-b771-5e3f-ad9e-33799f191a9c"
 JLD2 = "033835bb-8acc-5ee8-8aae-3f567f8a3819"
 NODEData = "56c15bac-5c7d-45b6-b0e6-74117a5d8120"
 OrdinaryDiffEq = "1dea7af3-3e70-54e6-95c3-0bf5283fa5ed"
+Plots = "91a5bcdd-55d7-5caf-9e0b-520d859cae80"
+PyPlot = "d330b81b-6aea-500a-939a-2ce795aea3ee"
 
 [compat]
 julia = "1.6"
