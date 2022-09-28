@@ -1,3 +1,5 @@
+module Lorenz96andNDE
+
 import Pkg
 Pkg.activate(".")
 using DynamicalSystems, CairoMakie 
