@@ -13,7 +13,7 @@ using Plots
 K = 5
 J = 8
 F = 8.5
-p=[F, 1, 10, 10] #TODO check params
+p=[F, 1, 10, 10] 
 x0 = F* ones(K)
 y0= F* ones(K*J)
 u0=[x0;y0]
@@ -85,12 +85,11 @@ tspan=(0., t_transient+N_t*0.1)
 
 prob = ODEProblem(Lorenz96, u0, tspan, (F, K));
 sol = solve(prob, Tsit5(), saveat=t_transient:dt:t_transient + N_t * dt)
-
 Plots.heatmap(Array(sol))
 #save("Lorenz96heatmapk5.png", Plots.heatmap(Array(sol)))
 
 t_train = t_transient:dt:t_transient+N_t_train*dt
-data_train = DeviceArray(sol(t_train)) #TODO subsetting to X
+data_train = DeviceArray(sol(t_train)) 
 
 t_valid = t_transient+N_t_train*dt:dt:t_transient+N_t_train*dt+N_t_valid*dt
 data_valid = DeviceArray(sol(t_valid))
@@ -115,7 +114,8 @@ function neural_l96(dx,x,p,t)
        dx[n] = (x[n + 1] - x[n - 2]) * x[n - 1] - x[n] + F - re_nn(p)(x)[n]
     end
 end
-node_prob = ODEProblem(neural_l96, u0, (Float32(0.),Float32(dt)), p) #todo change u0
+u01=u0[1:K]
+node_prob = ODEProblem(neural_l96, u01, (Float32(0.),Float32(dt)), p) #todo change u0
 
 predict(t, u0; reltol=1e-5) = DeviceArray(solve(remake(node_prob; tspan=(t[1],t[end]),u0=u0, p=p), Tsit5(), dt=dt, saveat = t, reltol=reltol))
 
