@@ -12,20 +12,20 @@ using Plots
 # parameters and initial conditions
 K = 5
 J = 8
-F = 8
-p=[F, 0.1, 0.2, 0.1]
+F = 8.5
+p=[F, 1, 10, 10] #TODO check params
 x0 = F* ones(K)
 y0= F* ones(K*J)
-u0=[x0,y0]
+u0=[x0;y0]
 #u0 = F * ones(K+J*K)
-u0[1][1] += 0.01 # small perturbation
+u0[1] += 0.01 # small perturbation
 
 # Values for trajectory
 dt = 0.01 # sampling time
 Tf = 30.0 # final time
 
-# predefined Lorenz-96 model from DynamicalSystems.jl
-ds = Systems.lorenz96(K; F = F) #todo google how to 2dim
+# predefined Lorenz-96 model from DynamicalSystems.jl - 1-level
+ds = Systems.lorenz96(K; F = F) 
 data=trajectory(ds, Tf; dt = dt)
 fig = CairoMakie.Figure(resolution = (500, 500))
 ax = Axis(fig[1, 1])
@@ -33,17 +33,16 @@ lines!(ax, data[:,1], data[:,2], linewidth=1.0)
 fig
 #save("Lorenz96in2D.png", fig)
 
-# maximum lyapunov exponent
-λ_max = lyapunov(ds, 1000, dt=dt)
-
 # Equivalently an explicit version to proceed
-function Lorenz96(dX, X, p, t)
-    x, y = X
-    dx, dy = dX
+function Lorenz96(dx, x, p, t)
+    #x, y = X
+    #dx, dy = dX
     F, h, c, b = p
+    dy=dx[K+1:end]
+    y=x[K+1:end]
     #slow-grid calculation
     # 3 edge cases explicitly 
-     dx[1] = (x[2] - x[K - 1]) * x[K] - x[1] + F - h*c/b * sum(y[1:J])
+     dx[1] = (x[2] - x[K - 1]) * x[K] - x[1] + F - h*c/b * sum(y[1:J]) 
      dx[2] = (x[3] - x[K]) * x[1] - x[2] + F - h*c/b * sum(y[(J+1):2*J])
      dx[K] = (x[1] - x[K - 2]) * x[K - 1] - x[K] + F - h*c/b * sum(y[(J*(K-1)+1):K*J])
     # general case
@@ -53,20 +52,24 @@ function Lorenz96(dX, X, p, t)
     #fast-grid calculation
     # 3 edge cases explicitly 
     dy[1] = -c*b*y[2]*(y[3]-y[J*K])-c*y[1]+F+h*c/b*x[1]
-    dy[J*K-1] = -c*b*y[J*K]*(y[1]-y[J*K-2])-c*y[J*K-1]+F+h*c/b*x[(J*K-2)/J+1]
-    dy[J*K] = -c*b*y[1]*(y[2]-y[J*K-1])-c*y[J*K]+F+h*c/b*x[(J*K-1)/J+1]
+    dy[J*K-1] = -c*b*y[J*K]*(y[1]-y[J*K-2])-c*y[J*K-1]+F+h*c/b*x[trunc(Int,(J*K-2)/J)+1]
+    dy[J*K] = -c*b*y[1]*(y[2]-y[J*K-1])-c*y[J*K]+F+h*c/b*x[trunc(Int,(J*K-1)/J)+1]
     # general case
     for j = 2:(J*K - 2)
-        dy[j] = -c*b*y[j+1]*(y[j+2]-y[j-1])-c*y[j]+F+h*c/b*x[(j-1)/J+1]
+        dy[j] = -c*b*y[j+1]*(y[j+2]-y[j-1])-c*y[j]+F+h*c/b*x[trunc(Int,(j-1)/J)+1]
     end
+    dx[K+1:end]=dy
+    x[K+1:end]=y
+    #dX=[dx dy]
 end
 
-ds = ContinuousDynamicalSystem(Lorenz96, u0, p)
+ds = ContinuousDynamicalSystem(Lorenz96,u0, p)
 tr = trajectory(ds, Tf; dt = dt)
 fig = CairoMakie.Figure(resolution = (500, 500))
 ax = Axis(fig[1, 1])
 lines!(ax, tr[:,1], tr[:,2], linewidth=1.0)
 fig
+
 
 #splitting data into training and validation
 N_t=500;
@@ -77,11 +80,14 @@ t_transient=100.;
 N_epochs = 20
 tspan=(0., t_transient+N_t*0.1)
 
+# maximum lyapunov exponent
+λ_max = lyapunov(ds, N_t, dt=dt)
+
 prob = ODEProblem(Lorenz96, u0, tspan, (F, K));
 sol = solve(prob, Tsit5(), saveat=t_transient:dt:t_transient + N_t * dt)
 
 Plots.heatmap(Array(sol))
-save("Lorenz96heatmapk5.png", Plots.heatmap(Array(sol)))
+#save("Lorenz96heatmapk5.png", Plots.heatmap(Array(sol)))
 
 t_train = t_transient:dt:t_transient+N_t_train*dt
 data_train = DeviceArray(sol(t_train)) #TODO subsetting to X
@@ -109,7 +115,7 @@ function neural_l96(dx,x,p,t)
        dx[n] = (x[n + 1] - x[n - 2]) * x[n - 1] - x[n] + F - re_nn(p)(x)[n]
     end
 end
-node_prob = ODEProblem(neural_l96, u0, (Float32(0.),Float32(dt)), p) #todo u0 anpassen
+node_prob = ODEProblem(neural_l96, u0, (Float32(0.),Float32(dt)), p) #todo change u0
 
 predict(t, u0; reltol=1e-5) = DeviceArray(solve(remake(node_prob; tspan=(t[1],t[end]),u0=u0, p=p), Tsit5(), dt=dt, saveat = t, reltol=reltol))
 
